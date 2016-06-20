@@ -48,7 +48,35 @@ module.exports = function makeRouterWithSockets (io) {
 
   // create a new tweet
   router.post('/tweets', function(req, res, next){
-    client.query('SELECT userid FROM tweets JOIN users on tweets.userid = users.id WHERE name=$1', [req.body.name], function(err, data){
+    /*Check if user already exists*/
+    client.query('SELECT name FROM users', function(err, data){
+      if (err){
+        console.error(err);
+      }
+      console.log("data.rows :", data.rows);
+      var isThereAlready = false;
+      for (var i=0; i< data.rows.length; i++){
+        if (data.rows[i].name === req.body.name){
+          isThereAlready = true;
+        }
+      }
+      console.log("isThereAlready: ", isThereAlready);
+
+    /*If not, add it to the user table.*/
+    if (!isThereAlready){
+      client.query('INSERT INTO users (name, pictureurl) VALUES($1, \'http://i.imgur.com/I8WtzSw.jpg\') RETURNING *', [req.body.name], function(err, data){
+        if (err){
+          console.error(err);
+        }
+        else{
+          console.log("It worked! data.rows: ", data.rows);
+          client.query('INSERT INTO tweets (userid, content) VALUES($1, $2)', [data.rows[0].id, req.body.content], function(err, data) {
+            res.redirect('/');
+          });
+        }
+      });
+    } else {
+      client.query('SELECT userid FROM tweets JOIN users on tweets.userid = users.id WHERE name=$1', [req.body.name], function(err, data){
       if (err){
         console.error(err);
       }
@@ -61,6 +89,11 @@ module.exports = function makeRouterWithSockets (io) {
       });
 
     });
+    }
+
+    });
+
+    
     });
 
     // var newTweet = tweetBank.add(req.body.name, req.body.content);
